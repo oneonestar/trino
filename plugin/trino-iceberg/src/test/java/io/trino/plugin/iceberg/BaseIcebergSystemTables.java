@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -195,6 +197,83 @@ public abstract class BaseIcebergSystemTables
 
         // Test the number of history entries
         assertQuery("SELECT count(*) FROM test_schema.\"test_table$history\"", "VALUES 3");
+    }
+
+    @Test
+    public void testMetadataLogEntriesTable()
+    {
+        assertQuery("SHOW COLUMNS FROM test_schema.\"test_table$metadata_log_entries\"",
+                "VALUES ('timestamp', 'timestamp(3) with time zone', '', '')," +
+                        "('file', 'varchar', '', '')," +
+                        "('latest_snapshot_id', 'bigint', '', '')," +
+                        "('latest_schema_id', 'integer', '', '')," +
+                        "('latest_sequence_number', 'bigint', '', '')");
+
+        List<Integer> latestSchemaId = new ArrayList<>();
+        List<Long> latestSequenceNumber = new ArrayList<>();
+        // Update this test after Iceberg fixed metadata_log_entries after RTAS (https://github.com/apache/iceberg/issues/9723)
+        assertUpdate("CREATE TABLE test_schema.test_metadata_log_entries (c1 BIGINT)");
+        latestSchemaId.add(0);
+        latestSequenceNumber.add(1L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("INSERT INTO test_schema.test_metadata_log_entries VALUES (1)", 1);
+        // INSERT create two commits (https://github.com/trinodb/trino/issues/15439) and share a same snapshotId
+        latestSchemaId.add(0);
+        latestSchemaId.add(0);
+        latestSequenceNumber.add(2L);
+        latestSequenceNumber.add(2L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("ALTER TABLE test_schema.test_metadata_log_entries ADD COLUMN c2 VARCHAR");
+        latestSchemaId.add(0);
+        latestSequenceNumber.add(2L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("DELETE FROM test_schema.test_metadata_log_entries WHERE c1 = 1", 1);
+        latestSchemaId.add(1);
+        latestSequenceNumber.add(3L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("ALTER TABLE test_schema.test_metadata_log_entries execute optimize");
+        latestSchemaId.add(1);
+        latestSequenceNumber.add(4L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("CREATE OR REPLACE TABLE test_schema.test_metadata_log_entries (c3 INTEGER)");
+        // Iceberg unintentionally deleted the history entries after RTAS
+        // Update this test after Iceberg release the fix (https://github.com/apache/iceberg/issues/9723)
+        latestSchemaId = new ArrayList<>();
+        latestSequenceNumber = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            latestSchemaId.add(null);
+            latestSequenceNumber.add(null);
+        }
+
+        latestSchemaId.add(2);
+        latestSequenceNumber.add(5L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("INSERT INTO test_schema.test_metadata_log_entries VALUES (1)", 1);
+        latestSchemaId.add(2);
+        latestSequenceNumber.add(6L);
+        latestSchemaId.add(2);
+        latestSequenceNumber.add(6L);
+        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+
+        assertUpdate("DROP TABLE IF EXISTS test_schema.test_metadata_log_entries");
+    }
+
+    private void testMetadataLogEntriesHelper(List<Integer> latestSchemaId, List<Long> latestSequenceNumber)
+    {
+        MaterializedResult result = computeActual("SELECT * FROM test_schema.\"test_metadata_log_entries$metadata_log_entries\" ORDER BY timestamp");
+        List<MaterializedRow> materializedRows = result.getMaterializedRows();
+
+        assertThat(result.getRowCount()).isEqualTo(latestSchemaId.size());
+        for (int i = 0; i < result.getRowCount(); i++) {
+            assertThat(materializedRows.get(i).getField(3)).isEqualTo(latestSchemaId.get(i));
+            assertThat(materializedRows.get(i).getField(4)).isEqualTo(latestSequenceNumber.get(i));
+        }
     }
 
     @Test

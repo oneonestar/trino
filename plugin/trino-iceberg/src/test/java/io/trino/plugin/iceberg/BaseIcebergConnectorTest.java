@@ -6308,18 +6308,23 @@ public abstract class BaseIcebergConnectorTest
     }
 
     @Test
-    public void testDeleteRetainsTableHistory()
+    public void testDeleteRetainsTableHistoryAndMetadataFile()
     {
         String tableName = "test_delete_retains_table_history_" + randomNameSuffix();
         assertUpdate("CREATE TABLE " + tableName + "(c1 INT, c2 INT)");
         assertUpdate("INSERT INTO " + tableName + " VALUES (1, 1), (2, 2), (3, 3)", 3);
         assertUpdate("INSERT INTO " + tableName + " VALUES (3, 3), (4, 4), (5, 5)", 3);
         List<Long> snapshots = getTableHistory(tableName);
+        List<Long> metadataLogEntries = getTableMetadataLogEntries(tableName);
 
         assertUpdate("DELETE FROM " + tableName + " WHERE c1 < 4", 4);
         List<Long> snapshotsAfterDelete = getTableHistory(tableName);
         assertThat(snapshotsAfterDelete.size()).isGreaterThan(snapshots.size());
         assertThat(snapshotsAfterDelete).containsAll(snapshots);
+
+        List<Long> metadataLogEntriesAfterDelete = getTableMetadataLogEntries(tableName);
+        assertThat(metadataLogEntriesAfterDelete.size()).isGreaterThan(metadataLogEntries.size());
+        assertThat(metadataLogEntriesAfterDelete).containsAll(metadataLogEntries);
         assertUpdate("DROP TABLE " + tableName);
     }
 
@@ -7854,6 +7859,14 @@ public abstract class BaseIcebergConnectorTest
     private List<Long> getTableHistory(String tableName)
     {
         return getQueryRunner().execute(format("SELECT snapshot_id FROM \"%s$history\"", tableName))
+                .getOnlyColumn()
+                .map(Long.class::cast)
+                .collect(toImmutableList());
+    }
+
+    private List<Long> getTableMetadataLogEntries(String tableName)
+    {
+        return getQueryRunner().execute(format("SELECT latest_sequence_number FROM \"%s$metadata_log_entries\"", tableName))
                 .getOnlyColumn()
                 .map(Long.class::cast)
                 .collect(toImmutableList());
