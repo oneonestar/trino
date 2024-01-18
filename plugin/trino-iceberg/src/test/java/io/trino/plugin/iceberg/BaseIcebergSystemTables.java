@@ -198,6 +198,20 @@ public abstract class BaseIcebergSystemTables
     }
 
     @Test
+    public void testMetadataLogEntriesTable()
+    {
+        assertQuery("SHOW COLUMNS FROM test_schema.\"test_table$metadata_log_entries\"",
+                "VALUES ('timestamp', 'timestamp(3) with time zone', '', '')," +
+                        "('file', 'varchar', '', '')," +
+                        "('latest_snapshot_id', 'bigint', '', '')," +
+                        "('latest_schema_id', 'integer', '', '')," +
+                        "('latest_sequence_number', 'bigint', '', '')");
+
+        // Test the number of metadata_log_entries entries
+        assertQuery("SELECT count(*) FROM test_schema.\"test_table$metadata_log_entries\"", "VALUES 5");
+    }
+
+    @Test
     public void testSnapshotsTable()
     {
         assertQuery("SHOW COLUMNS FROM test_schema.\"test_table$snapshots\"",
