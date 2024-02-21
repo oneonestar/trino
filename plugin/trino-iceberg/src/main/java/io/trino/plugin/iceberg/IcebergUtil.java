@@ -48,6 +48,7 @@ import io.trino.spi.type.UuidType;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.DataTask;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.HistoryEntry;
@@ -64,11 +65,14 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.LocationProvider;
 import org.apache.iceberg.types.Type.PrimitiveType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StructType;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandle;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -84,6 +88,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -818,5 +823,25 @@ public final class IcebergUtil
         return mapWithIndex(schema.columns().stream(),
                 (column, position) -> immutableEntry(column.name(), Long.valueOf(position).intValue()))
                 .collect(toImmutableMap(Entry::getKey, Entry::getValue));
+    }
+
+    public static void forEachRowInTableScan(TableScan tableScan, Consumer<StructLike> consumer)
+    {
+        try (CloseableIterable<FileScanTask> fileScanTasks = tableScan.planFiles()) {
+            fileScanTasks.forEach(fileScanTask -> addRows((DataTask) fileScanTask, consumer));
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public static void addRows(DataTask dataTask, Consumer<StructLike> consumer)
+    {
+        try (CloseableIterable<StructLike> dataRows = dataTask.rows()) {
+            dataRows.forEach(consumer);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

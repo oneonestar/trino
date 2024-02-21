@@ -26,20 +26,15 @@ import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SystemTable;
 import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.type.TimeZoneKey;
-import org.apache.iceberg.DataTask;
-import org.apache.iceberg.FileScanTask;
-import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableScan;
-import org.apache.iceberg.io.CloseableIterable;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 
 import static io.trino.plugin.iceberg.IcebergUtil.buildTableScan;
 import static io.trino.plugin.iceberg.IcebergUtil.columnNameToPositionInSchema;
+import static io.trino.plugin.iceberg.IcebergUtil.forEachRowInTableScan;
 import static io.trino.spi.type.BigintType.BIGINT;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
@@ -94,43 +89,23 @@ public class MetadataLogEntriesTable
     private static List<Page> buildPages(ConnectorTableMetadata tableMetadata, ConnectorSession session, Table icebergTable)
     {
         PageListBuilder pagesBuilder = PageListBuilder.forTable(tableMetadata);
-
         TableScan tableScan = buildTableScan(icebergTable, METADATA_LOG_ENTRIES);
         TimeZoneKey timeZoneKey = session.getTimeZoneKey();
-
         Map<String, Integer> columnNameToPosition = columnNameToPositionInSchema(tableScan.schema());
 
-        try (CloseableIterable<FileScanTask> fileScanTasks = tableScan.planFiles()) {
-            fileScanTasks.forEach(fileScanTask -> addRows((DataTask) fileScanTask, pagesBuilder, timeZoneKey, columnNameToPosition));
-        }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        forEachRowInTableScan(tableScan, structLike -> {
+            pagesBuilder.beginRow();
+
+            pagesBuilder.appendTimestampTzMillis(
+                    structLike.get(columnNameToPosition.get(TIMESTAMP_COLUMN_NAME), Long.class) / MICROSECONDS_PER_MILLISECOND,
+                    timeZoneKey);
+            pagesBuilder.appendVarchar(structLike.get(columnNameToPosition.get(FILE_COLUMN_NAME), String.class));
+            pagesBuilder.appendBigint(structLike.get(columnNameToPosition.get(LATEST_SNAPSHOT_ID_COLUMN_NAME), Long.class));
+            pagesBuilder.appendInteger(structLike.get(columnNameToPosition.get(LATEST_SCHEMA_ID_COLUMN_NAME), Integer.class));
+            pagesBuilder.appendBigint(structLike.get(columnNameToPosition.get(LATEST_SEQUENCE_NUMBER_COLUMN_NAME), Long.class));
+            pagesBuilder.endRow();
+        });
 
         return pagesBuilder.build();
-    }
-
-    private static void addRows(DataTask dataTask, PageListBuilder pagesBuilder, TimeZoneKey timeZoneKey, Map<String, Integer> columnNameToPositionInSchema)
-    {
-        try (CloseableIterable<StructLike> dataRows = dataTask.rows()) {
-            dataRows.forEach(dataTaskRow -> addRow(pagesBuilder, dataTaskRow, timeZoneKey, columnNameToPositionInSchema));
-        }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private static void addRow(PageListBuilder pagesBuilder, StructLike structLike, TimeZoneKey timeZoneKey, Map<String, Integer> columnNameToPositionInSchema)
-    {
-        pagesBuilder.beginRow();
-
-        pagesBuilder.appendTimestampTzMillis(
-                structLike.get(columnNameToPositionInSchema.get(TIMESTAMP_COLUMN_NAME), Long.class) / MICROSECONDS_PER_MILLISECOND,
-                timeZoneKey);
-        pagesBuilder.appendVarchar(structLike.get(columnNameToPositionInSchema.get(FILE_COLUMN_NAME), String.class));
-        pagesBuilder.appendBigint(structLike.get(columnNameToPositionInSchema.get(LATEST_SNAPSHOT_ID_COLUMN_NAME), Long.class));
-        pagesBuilder.appendInteger(structLike.get(columnNameToPositionInSchema.get(LATEST_SCHEMA_ID_COLUMN_NAME), Integer.class));
-        pagesBuilder.appendBigint(structLike.get(columnNameToPositionInSchema.get(LATEST_SEQUENCE_NUMBER_COLUMN_NAME), Long.class));
-        pagesBuilder.endRow();
     }
 }
