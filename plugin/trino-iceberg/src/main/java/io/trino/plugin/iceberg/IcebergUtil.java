@@ -51,7 +51,6 @@ import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.HistoryEntry;
-import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -62,7 +61,6 @@ import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
-import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.io.LocationProvider;
 import org.apache.iceberg.types.Type.PrimitiveType;
@@ -93,8 +91,6 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static com.google.common.collect.Maps.immutableEntry;
-import static com.google.common.collect.Streams.mapWithIndex;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.trino.plugin.base.io.ByteBuffers.getWrappedBytes;
 import static io.trino.plugin.hive.HiveMetadata.TABLE_COMMENT;
@@ -152,7 +148,6 @@ import static java.lang.String.format;
 import static java.math.RoundingMode.UNNECESSARY;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
-import static org.apache.iceberg.MetadataTableUtils.createMetadataTableInstance;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 import static org.apache.iceberg.TableProperties.FORMAT_VERSION;
@@ -806,17 +801,5 @@ public final class IcebergUtil
     {
         update.set(TRINO_QUERY_ID_NAME, session.getQueryId());
         update.commit();
-    }
-
-    public static TableScan buildTableScan(Table icebergTable, MetadataTableType metadataTableType)
-    {
-        return createMetadataTableInstance(icebergTable, metadataTableType).newScan();
-    }
-
-    public static Map<String, Integer> columnNameToPositionInSchema(Schema schema)
-    {
-        return mapWithIndex(schema.columns().stream(),
-                (column, position) -> immutableEntry(column.name(), Long.valueOf(position).intValue()))
-                .collect(toImmutableMap(Entry::getKey, Entry::getValue));
     }
 }
