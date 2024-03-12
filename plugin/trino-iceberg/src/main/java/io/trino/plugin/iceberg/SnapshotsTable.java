@@ -16,16 +16,12 @@ package io.trino.plugin.iceberg;
 import com.google.common.collect.ImmutableList;
 import io.trino.plugin.iceberg.util.PageListBuilder;
 import io.trino.spi.connector.ColumnMetadata;
-import io.trino.spi.connector.ConnectorPageSource;
-import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableMetadata;
-import io.trino.spi.connector.ConnectorTransactionHandle;
-import io.trino.spi.connector.FixedPageSource;
 import io.trino.spi.connector.SchemaTableName;
-import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.type.TimeZoneKey;
 import io.trino.spi.type.TypeManager;
 import io.trino.spi.type.TypeSignature;
+import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 
@@ -50,10 +46,11 @@ public class SnapshotsTable
 
     public SnapshotsTable(SchemaTableName tableName, TypeManager typeManager, Table icebergTable)
     {
+        super(icebergTable);
         requireNonNull(typeManager, "typeManager is null");
-
-        this.icebergTable = requireNonNull(icebergTable, "icebergTable is null");
-        tableMetadata = new ConnectorTableMetadata(requireNonNull(tableName, "tableName is null"),
+        requireNonNull(tableName, "tableName is null");
+        tableMetadata = new ConnectorTableMetadata(
+                tableName,
                 ImmutableList.<ColumnMetadata>builder()
                         .add(new ColumnMetadata(COMMITTED_AT_COLUMN_NAME, TIMESTAMP_TZ_MILLIS))
                         .add(new ColumnMetadata(SNAPSHOT_ID_COLUMN_NAME, BIGINT))
@@ -65,9 +62,9 @@ public class SnapshotsTable
     }
 
     @Override
-    public ConnectorPageSource pageSource(ConnectorTransactionHandle transactionHandle, ConnectorSession session, TupleDomain<Integer> constraint)
+    protected MetadataTableType getMetadataTableType()
     {
-        return new FixedPageSource(buildPages(tableMetadata, session, icebergTable, SNAPSHOTS));
+        return SNAPSHOTS;
     }
 
     @Override

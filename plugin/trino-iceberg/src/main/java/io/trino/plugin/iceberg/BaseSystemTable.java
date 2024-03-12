@@ -19,6 +19,7 @@ import io.trino.spi.connector.ConnectorPageSource;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.connector.FixedPageSource;
 import io.trino.spi.connector.SystemTable;
 import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.type.TimeZoneKey;
@@ -38,13 +39,19 @@ import java.util.Map;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Maps.immutableEntry;
 import static com.google.common.collect.Streams.mapWithIndex;
+import static java.util.Objects.requireNonNull;
 import static org.apache.iceberg.MetadataTableUtils.createMetadataTableInstance;
 
 public abstract class BaseSystemTable
         implements SystemTable
 {
+    protected final Table icebergTable;
     protected ConnectorTableMetadata tableMetadata;
-    protected Table icebergTable;
+
+    BaseSystemTable(Table icebergTable)
+    {
+        this.icebergTable = requireNonNull(icebergTable, "icebergTable is null");
+    }
 
     @Override
     public Distribution getDistribution()
@@ -59,7 +66,12 @@ public abstract class BaseSystemTable
     }
 
     @Override
-    public abstract ConnectorPageSource pageSource(ConnectorTransactionHandle transactionHandle, ConnectorSession session, TupleDomain<Integer> constraint);
+    public ConnectorPageSource pageSource(ConnectorTransactionHandle transactionHandle, ConnectorSession session, TupleDomain<Integer> constraint)
+    {
+        return new FixedPageSource(buildPages(tableMetadata, session, icebergTable, getMetadataTableType()));
+    }
+
+    protected abstract MetadataTableType getMetadataTableType();
 
     protected List<Page> buildPages(ConnectorTableMetadata tableMetadata, ConnectorSession session, Table icebergTable, MetadataTableType metadataTableType)
     {
