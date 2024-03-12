@@ -6308,23 +6308,33 @@ public abstract class BaseIcebergConnectorTest
     }
 
     @Test
-    public void testDeleteRetainsTableHistoryAndMetadataFile()
+    public void testDeleteRetainsTableHistory()
     {
         String tableName = "test_delete_retains_table_history_" + randomNameSuffix();
         assertUpdate("CREATE TABLE " + tableName + "(c1 INT, c2 INT)");
         assertUpdate("INSERT INTO " + tableName + " VALUES (1, 1), (2, 2), (3, 3)", 3);
         assertUpdate("INSERT INTO " + tableName + " VALUES (3, 3), (4, 4), (5, 5)", 3);
         List<Long> snapshots = getTableHistory(tableName);
-        List<Long> metadataLogEntries = getTableMetadataLogEntries(tableName);
 
         assertUpdate("DELETE FROM " + tableName + " WHERE c1 < 4", 4);
         List<Long> snapshotsAfterDelete = getTableHistory(tableName);
         assertThat(snapshotsAfterDelete.size()).isGreaterThan(snapshots.size());
         assertThat(snapshotsAfterDelete).containsAll(snapshots);
+    }
 
-        List<Long> metadataLogEntriesAfterDelete = getTableMetadataLogEntries(tableName);
-        assertThat(metadataLogEntriesAfterDelete.size()).isGreaterThan(metadataLogEntries.size());
-        assertThat(metadataLogEntriesAfterDelete).containsAll(metadataLogEntries);
+    @Test
+    public void testDeleteRetainsMetadataFile()
+    {
+        String tableName = "test_delete_retains_metadata_file_" + randomNameSuffix();
+        assertUpdate("CREATE TABLE " + tableName + "(c1 INT, c2 INT)");
+        assertUpdate("INSERT INTO " + tableName + " VALUES (1, 1), (2, 2), (3, 3)", 3);
+        assertUpdate("INSERT INTO " + tableName + " VALUES (3, 3), (4, 4), (5, 5)", 3);
+        List<Long> metadataLogEntries = getLatestSequenceNumbersInMetadataLogEntries(tableName);
+
+        List<Long> metadataLogEntriesAfterDelete = getLatestSequenceNumbersInMetadataLogEntries(tableName);
+        assertThat(metadataLogEntriesAfterDelete)
+                .hasSizeGreaterThan(metadataLogEntries.size())
+                .containsAll(metadataLogEntries);
         assertUpdate("DROP TABLE " + tableName);
     }
 
@@ -7864,7 +7874,7 @@ public abstract class BaseIcebergConnectorTest
                 .collect(toImmutableList());
     }
 
-    private List<Long> getTableMetadataLogEntries(String tableName)
+    private List<Long> getLatestSequenceNumbersInMetadataLogEntries(String tableName)
     {
         return getQueryRunner().execute(format("SELECT latest_sequence_number FROM \"%s$metadata_log_entries\"", tableName))
                 .getOnlyColumn()

@@ -16,14 +16,10 @@ package io.trino.plugin.iceberg;
 import com.google.common.collect.ImmutableList;
 import io.trino.plugin.iceberg.util.PageListBuilder;
 import io.trino.spi.connector.ColumnMetadata;
-import io.trino.spi.connector.ConnectorPageSource;
-import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableMetadata;
-import io.trino.spi.connector.ConnectorTransactionHandle;
-import io.trino.spi.connector.FixedPageSource;
 import io.trino.spi.connector.SchemaTableName;
-import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.type.TimeZoneKey;
+import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 
@@ -48,9 +44,10 @@ public class MetadataLogEntriesTable
 
     public MetadataLogEntriesTable(SchemaTableName tableName, Table icebergTable)
     {
-        this.icebergTable = requireNonNull(icebergTable, "icebergTable is null");
-
-        tableMetadata = new ConnectorTableMetadata(requireNonNull(tableName, "tableName is null"),
+        super(icebergTable);
+        requireNonNull(tableName, "tableName is null");
+        tableMetadata = new ConnectorTableMetadata(
+                tableName,
                 ImmutableList.<ColumnMetadata>builder()
                         .add(new ColumnMetadata(TIMESTAMP_COLUMN_NAME, TIMESTAMP_TZ_MILLIS))
                         .add(new ColumnMetadata(FILE_COLUMN_NAME, VARCHAR))
@@ -61,9 +58,9 @@ public class MetadataLogEntriesTable
     }
 
     @Override
-    public ConnectorPageSource pageSource(ConnectorTransactionHandle transactionHandle, ConnectorSession session, TupleDomain<Integer> constraint)
+    protected MetadataTableType getMetadataTableType()
     {
-        return new FixedPageSource(buildPages(tableMetadata, session, icebergTable, METADATA_LOG_ENTRIES));
+        return METADATA_LOG_ENTRIES;
     }
 
     @Override

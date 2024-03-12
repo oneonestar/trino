@@ -451,7 +451,7 @@ public class TestIcebergGlueCatalogAccessOperations
             // select from $metadata_log_entries
             assertGlueMetastoreApiInvocations("SELECT * FROM \"test_select_snapshots$metadata_log_entries\"",
                     ImmutableMultiset.builder()
-                            .addCopies(GET_TABLE, 1)
+                            .add(GET_TABLE)
                             .build());
 
             // select from $snapshots

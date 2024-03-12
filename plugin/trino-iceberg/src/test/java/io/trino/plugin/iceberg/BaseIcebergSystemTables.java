@@ -209,70 +209,70 @@ public abstract class BaseIcebergSystemTables
                         "('latest_schema_id', 'integer', '', '')," +
                         "('latest_sequence_number', 'bigint', '', '')");
 
-        List<Integer> latestSchemaId = new ArrayList<>();
-        List<Long> latestSequenceNumber = new ArrayList<>();
-        // Update this test after Iceberg fixed metadata_log_entries after RTAS (https://github.com/apache/iceberg/issues/9723)
+        List<Integer> latestSchemaIds = new ArrayList<>();
+        List<Long> latestSequenceNumbers = new ArrayList<>();
+
         assertUpdate("CREATE TABLE test_schema.test_metadata_log_entries (c1 BIGINT)");
-        latestSchemaId.add(0);
-        latestSequenceNumber.add(1L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(0);
+        latestSequenceNumbers.add(1L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("INSERT INTO test_schema.test_metadata_log_entries VALUES (1)", 1);
         // INSERT create two commits (https://github.com/trinodb/trino/issues/15439) and share a same snapshotId
-        latestSchemaId.add(0);
-        latestSchemaId.add(0);
-        latestSequenceNumber.add(2L);
-        latestSequenceNumber.add(2L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(0);
+        latestSchemaIds.add(0);
+        latestSequenceNumbers.add(2L);
+        latestSequenceNumbers.add(2L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("ALTER TABLE test_schema.test_metadata_log_entries ADD COLUMN c2 VARCHAR");
-        latestSchemaId.add(0);
-        latestSequenceNumber.add(2L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(0);
+        latestSequenceNumbers.add(2L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("DELETE FROM test_schema.test_metadata_log_entries WHERE c1 = 1", 1);
-        latestSchemaId.add(1);
-        latestSequenceNumber.add(3L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(1);
+        latestSequenceNumbers.add(3L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("ALTER TABLE test_schema.test_metadata_log_entries execute optimize");
-        latestSchemaId.add(1);
-        latestSequenceNumber.add(4L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(1);
+        latestSequenceNumbers.add(4L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("CREATE OR REPLACE TABLE test_schema.test_metadata_log_entries (c3 INTEGER)");
         // Iceberg unintentionally deleted the history entries after RTAS
         // Update this test after Iceberg release the fix (https://github.com/apache/iceberg/issues/9723)
-        latestSchemaId = new ArrayList<>();
-        latestSequenceNumber = new ArrayList<>();
+        latestSchemaIds = new ArrayList<>();
+        latestSequenceNumbers = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
-            latestSchemaId.add(null);
-            latestSequenceNumber.add(null);
+            latestSchemaIds.add(null);
+            latestSequenceNumbers.add(null);
         }
 
-        latestSchemaId.add(2);
-        latestSequenceNumber.add(5L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(2);
+        latestSequenceNumbers.add(5L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("INSERT INTO test_schema.test_metadata_log_entries VALUES (1)", 1);
-        latestSchemaId.add(2);
-        latestSequenceNumber.add(6L);
-        latestSchemaId.add(2);
-        latestSequenceNumber.add(6L);
-        testMetadataLogEntriesHelper(latestSchemaId, latestSequenceNumber);
+        latestSchemaIds.add(2);
+        latestSequenceNumbers.add(6L);
+        latestSchemaIds.add(2);
+        latestSequenceNumbers.add(6L);
+        assertMetadataLogEntries(latestSchemaIds, latestSequenceNumbers);
 
         assertUpdate("DROP TABLE IF EXISTS test_schema.test_metadata_log_entries");
     }
 
-    private void testMetadataLogEntriesHelper(List<Integer> latestSchemaId, List<Long> latestSequenceNumber)
+    private void assertMetadataLogEntries(List<Integer> latestSchemaIds, List<Long> latestSequenceNumbers)
     {
-        MaterializedResult result = computeActual("SELECT * FROM test_schema.\"test_metadata_log_entries$metadata_log_entries\" ORDER BY timestamp");
+        MaterializedResult result = computeActual("SELECT latest_schema_id, latest_sequence_number FROM test_schema.\"test_metadata_log_entries$metadata_log_entries\" ORDER BY timestamp");
         List<MaterializedRow> materializedRows = result.getMaterializedRows();
 
-        assertThat(result.getRowCount()).isEqualTo(latestSchemaId.size());
+        assertThat(result.getRowCount()).isEqualTo(latestSchemaIds.size());
         for (int i = 0; i < result.getRowCount(); i++) {
-            assertThat(materializedRows.get(i).getField(3)).isEqualTo(latestSchemaId.get(i));
-            assertThat(materializedRows.get(i).getField(4)).isEqualTo(latestSequenceNumber.get(i));
+            assertThat(materializedRows.get(i).getField(0)).isEqualTo(latestSchemaIds.get(i));
+            assertThat(materializedRows.get(i).getField(1)).isEqualTo(latestSequenceNumbers.get(i));
         }
     }
 

@@ -305,7 +305,7 @@ public class TestIcebergMetastoreAccessOperations
         // select from $metadata_log_entries
         assertMetastoreInvocations("SELECT * FROM \"test_select_snapshots$metadata_log_entries\"",
                 ImmutableMultiset.<MetastoreMethod>builder()
-                        .addCopies(GET_TABLE, 1)
+                        .add(GET_TABLE)
                         .build());
 
         // select from $snapshots
