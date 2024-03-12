@@ -46,11 +46,12 @@ public abstract class BaseSystemTable
         implements SystemTable
 {
     protected final Table icebergTable;
-    protected ConnectorTableMetadata tableMetadata;
+    protected final ConnectorTableMetadata tableMetadata;
 
-    BaseSystemTable(Table icebergTable)
+    BaseSystemTable(Table icebergTable, ConnectorTableMetadata tableMetadata)
     {
         this.icebergTable = requireNonNull(icebergTable, "icebergTable is null");
+        this.tableMetadata = requireNonNull(tableMetadata, "tableMetadata is null");
     }
 
     @Override

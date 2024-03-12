@@ -19,6 +19,8 @@ import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.type.TimeZoneKey;
+import io.trino.spi.type.TypeManager;
+import io.trino.spi.type.TypeSignature;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
@@ -44,10 +46,13 @@ public class MetadataLogEntriesTable
 
     public MetadataLogEntriesTable(SchemaTableName tableName, Table icebergTable)
     {
-        super(icebergTable);
-        requireNonNull(tableName, "tableName is null");
-        tableMetadata = new ConnectorTableMetadata(
-                tableName,
+        super(icebergTable, createConnectorTableMetadata(requireNonNull(tableName, "tableName is null")));
+    }
+
+    private static ConnectorTableMetadata createConnectorTableMetadata(SchemaTableName tableName)
+    {
+        return new ConnectorTableMetadata(
+                requireNonNull(tableName, "tableName is null"),
                 ImmutableList.<ColumnMetadata>builder()
                         .add(new ColumnMetadata(TIMESTAMP_COLUMN_NAME, TIMESTAMP_TZ_MILLIS))
                         .add(new ColumnMetadata(FILE_COLUMN_NAME, VARCHAR))

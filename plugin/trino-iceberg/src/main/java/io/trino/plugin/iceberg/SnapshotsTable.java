@@ -46,18 +46,23 @@ public class SnapshotsTable
 
     public SnapshotsTable(SchemaTableName tableName, TypeManager typeManager, Table icebergTable)
     {
-        super(icebergTable);
-        requireNonNull(typeManager, "typeManager is null");
-        requireNonNull(tableName, "tableName is null");
-        tableMetadata = new ConnectorTableMetadata(
-                tableName,
+        super(icebergTable, createConnectorTableMetadata(
+                requireNonNull(tableName, "tableName is null"),
+                requireNonNull(typeManager, "typeManager is null")));
+    }
+
+    private static ConnectorTableMetadata createConnectorTableMetadata(SchemaTableName tableName, TypeManager typeManager)
+    {
+        return new ConnectorTableMetadata(
+                requireNonNull(tableName, "tableName is null"),
                 ImmutableList.<ColumnMetadata>builder()
                         .add(new ColumnMetadata(COMMITTED_AT_COLUMN_NAME, TIMESTAMP_TZ_MILLIS))
                         .add(new ColumnMetadata(SNAPSHOT_ID_COLUMN_NAME, BIGINT))
                         .add(new ColumnMetadata(PARENT_ID_COLUMN_NAME, BIGINT))
                         .add(new ColumnMetadata(OPERATION_COLUMN_NAME, VARCHAR))
                         .add(new ColumnMetadata(MANIFEST_LIST_COLUMN_NAME, VARCHAR))
-                        .add(new ColumnMetadata(SUMMARY_COLUMN_NAME, typeManager.getType(TypeSignature.mapType(VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature()))))
+                        .add(new ColumnMetadata(SUMMARY_COLUMN_NAME, requireNonNull(typeManager, "typeManager is null")
+                                .getType(TypeSignature.mapType(VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature()))))
                         .build());
     }
 
