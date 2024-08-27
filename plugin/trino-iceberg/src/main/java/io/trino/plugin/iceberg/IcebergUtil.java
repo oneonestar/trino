@@ -118,6 +118,8 @@ import static io.trino.plugin.iceberg.IcebergErrorCode.ICEBERG_INVALID_PARTITION
 import static io.trino.plugin.iceberg.IcebergTableProperties.FILE_FORMAT_PROPERTY;
 import static io.trino.plugin.iceberg.IcebergTableProperties.FORMAT_VERSION_PROPERTY;
 import static io.trino.plugin.iceberg.IcebergTableProperties.LOCATION_PROPERTY;
+import static io.trino.plugin.iceberg.IcebergTableProperties.METADATA_DELETE_AFTER_COMMIT_ENABLED_PROPERTY;
+import static io.trino.plugin.iceberg.IcebergTableProperties.METADATA_PREVIOUS_VERSIONS_MAX_PROPERTY;
 import static io.trino.plugin.iceberg.IcebergTableProperties.ORC_BLOOM_FILTER_COLUMNS_PROPERTY;
 import static io.trino.plugin.iceberg.IcebergTableProperties.ORC_BLOOM_FILTER_FPP_PROPERTY;
 import static io.trino.plugin.iceberg.IcebergTableProperties.PARQUET_BLOOM_FILTER_COLUMNS_PROPERTY;
@@ -165,6 +167,8 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 import static org.apache.iceberg.TableProperties.FORMAT_VERSION;
+import static org.apache.iceberg.TableProperties.METADATA_DELETE_AFTER_COMMIT_ENABLED;
+import static org.apache.iceberg.TableProperties.METADATA_PREVIOUS_VERSIONS_MAX;
 import static org.apache.iceberg.TableProperties.OBJECT_STORE_ENABLED;
 import static org.apache.iceberg.TableProperties.OBJECT_STORE_ENABLED_DEFAULT;
 import static org.apache.iceberg.TableProperties.OBJECT_STORE_PATH;
@@ -311,6 +315,15 @@ public final class IcebergUtil
         Set<String> parquetBloomFilterColumns = getParquetBloomFilterColumns(icebergTable.properties());
         if (!parquetBloomFilterColumns.isEmpty()) {
             properties.put(PARQUET_BLOOM_FILTER_COLUMNS_PROPERTY, ImmutableList.copyOf(parquetBloomFilterColumns));
+        }
+
+        String metadataDeleteAfterCommitEnabled = icebergTable.properties().get(METADATA_DELETE_AFTER_COMMIT_ENABLED);
+        if (metadataDeleteAfterCommitEnabled != null) {
+            properties.put(METADATA_DELETE_AFTER_COMMIT_ENABLED_PROPERTY, Boolean.parseBoolean(metadataDeleteAfterCommitEnabled));
+        }
+        String metadataPreviousVersionsMax = icebergTable.properties().get(METADATA_PREVIOUS_VERSIONS_MAX);
+        if (metadataPreviousVersionsMax != null) {
+            properties.put(METADATA_PREVIOUS_VERSIONS_MAX_PROPERTY, Integer.parseInt(metadataPreviousVersionsMax));
         }
 
         return properties.buildOrThrow();
@@ -811,6 +824,13 @@ public final class IcebergUtil
             for (String column : parquetBloomFilterColumns) {
                 propertiesBuilder.put(PARQUET_BLOOM_FILTER_COLUMN_ENABLED_PREFIX + column, "true");
             }
+        }
+
+        if (tableMetadata.getProperties().containsKey(METADATA_DELETE_AFTER_COMMIT_ENABLED_PROPERTY)) {
+            propertiesBuilder.put(METADATA_DELETE_AFTER_COMMIT_ENABLED, ((Boolean) tableMetadata.getProperties().get(METADATA_DELETE_AFTER_COMMIT_ENABLED_PROPERTY)).toString());
+        }
+        if (tableMetadata.getProperties().containsKey(METADATA_PREVIOUS_VERSIONS_MAX_PROPERTY)) {
+            propertiesBuilder.put(METADATA_PREVIOUS_VERSIONS_MAX, ((Integer) tableMetadata.getProperties().get(METADATA_PREVIOUS_VERSIONS_MAX_PROPERTY)).toString());
         }
 
         if (tableMetadata.getComment().isPresent()) {
